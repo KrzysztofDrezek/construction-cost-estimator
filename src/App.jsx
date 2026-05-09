@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
+const API_URL = "http://localhost:5000/api/estimates";
+
 const workTypes = {
   flooring: {
     label: "Flooring",
@@ -107,22 +109,35 @@ function App() {
   const [estimateItems, setEstimateItems] = useState([]);
   const [expandedEstimateId, setExpandedEstimateId] = useState(null);
 
-  const [savedEstimates, setSavedEstimates] = useState(() => {
-    try {
-      const storedEstimates = localStorage.getItem("constructionEstimates");
-      const parsedEstimates = storedEstimates ? JSON.parse(storedEstimates) : [];
-
-      return parsedEstimates.filter((estimate) => Array.isArray(estimate.items));
-    } catch {
-      return [];
-    }
-  });
+  const [savedEstimates, setSavedEstimates] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const selectedWork = workTypes[workType];
 
   useEffect(() => {
-    localStorage.setItem("constructionEstimates", JSON.stringify(savedEstimates));
-  }, [savedEstimates]);
+  const fetchEstimates = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      const response = await fetch(API_URL);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch estimates.");
+      }
+
+      const data = await response.json();
+      setSavedEstimates(data);
+    } catch (error) {
+      setErrorMessage("Could not load saved estimates from the server.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  fetchEstimates();
+}, []);
 
   const suggestedMaterialCost = selectedWork.materials.reduce(
     (total, material) => total + material[quality],
@@ -386,13 +401,12 @@ const handlePrintEstimate = (estimate) => {
   printWindow.document.close();
 };
 
-  const handleSaveEstimate = () => {
+  const handleSaveEstimate = async () => {
     if (estimateItems.length === 0) {
       return;
     }
 
     const newEstimate = {
-      id: Date.now(),
       estimateNumber: `EST-${Date.now().toString().slice(-6)}`,
       projectName: projectName.trim() || "Unnamed project",
       projectNotes: projectNotes.trim() || "No additional notes",
@@ -404,14 +418,48 @@ const handlePrintEstimate = (estimate) => {
       createdAt: new Date().toLocaleDateString("en-GB"),
     };
 
-    setSavedEstimates([newEstimate, ...savedEstimates]);
-    setProjectName("");
-    setProjectNotes("");
-    setEstimateItems([]);
+    try {
+      setErrorMessage("");
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newEstimate),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save estimate.");
+      }
+
+      const savedEstimate = await response.json();
+
+      setSavedEstimates([savedEstimate, ...savedEstimates]);
+      setProjectName("");
+      setProjectNotes("");
+      setEstimateItems([]);
+    } catch (error) {
+      setErrorMessage("Could not save estimate to the server.");
+    }
   };
 
-  const handleDeleteEstimate = (id) => {
-    setSavedEstimates(savedEstimates.filter((estimate) => estimate.id !== id));
+  const handleDeleteEstimate = async (id) => {
+    try {
+      setErrorMessage("");
+
+      const response = await fetch(`${API_URL}/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete estimate.");
+      }
+
+      setSavedEstimates(savedEstimates.filter((estimate) => estimate.id !== id));
+    } catch (error) {
+      setErrorMessage("Could not delete estimate from the server.");
+    }
   };
 
   return (
@@ -646,7 +694,11 @@ const handlePrintEstimate = (estimate) => {
       <section className="panel saved-panel">
         <h2>Saved estimates</h2>
 
-        {savedEstimates.length === 0 ? (
+        {errorMessage && <p className="error-message">{errorMessage}</p>}
+
+        {isLoading ? (
+          <p className="empty-message">Loading saved estimates...</p>
+        ) : savedEstimates.length === 0 ? (
           <p className="empty-message">No saved estimates yet.</p>
         ) : (
           <div className="saved-list">
