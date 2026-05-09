@@ -93,23 +93,35 @@ const workTypes = {
 };
 
 function App() {
-  const [workType, setWorkType] = useState("flooring");
   const [projectName, setProjectName] = useState("");
+  const [projectNotes, setProjectNotes] = useState("");
+
+  const [workType, setWorkType] = useState("flooring");
   const [area, setArea] = useState(20);
   const [pricingMode, setPricingMode] = useState("suggested");
   const [quality, setQuality] = useState("standard");
   const [manualMaterialCost, setManualMaterialCost] = useState(20);
   const [labourCost, setLabourCost] = useState(25);
+
   const [vatRate, setVatRate] = useState(20);
+  const [estimateItems, setEstimateItems] = useState([]);
+
   const [savedEstimates, setSavedEstimates] = useState(() => {
-  const storedEstimates = localStorage.getItem("constructionEstimates");
-  return storedEstimates ? JSON.parse(storedEstimates) : [];
-});
+    try {
+      const storedEstimates = localStorage.getItem("constructionEstimates");
+      const parsedEstimates = storedEstimates ? JSON.parse(storedEstimates) : [];
+
+      return parsedEstimates.filter((estimate) => Array.isArray(estimate.items));
+    } catch {
+      return [];
+    }
+  });
 
   const selectedWork = workTypes[workType];
+
   useEffect(() => {
-  localStorage.setItem("constructionEstimates", JSON.stringify(savedEstimates));
-}, [savedEstimates]);
+    localStorage.setItem("constructionEstimates", JSON.stringify(savedEstimates));
+  }, [savedEstimates]);
 
   const suggestedMaterialCost = selectedWork.materials.reduce(
     (total, material) => total + material[quality],
@@ -119,9 +131,11 @@ function App() {
   const materialCostPerUnit =
     pricingMode === "suggested" ? suggestedMaterialCost : Number(manualMaterialCost);
 
-  const materialTotal = Number(area) * materialCostPerUnit;
-  const labourTotal = Number(area) * Number(labourCost);
-  const subtotal = materialTotal + labourTotal;
+  const currentMaterialTotal = Number(area) * materialCostPerUnit;
+  const currentLabourTotal = Number(area) * Number(labourCost);
+  const currentItemTotal = currentMaterialTotal + currentLabourTotal;
+
+  const subtotal = estimateItems.reduce((total, item) => total + item.total, 0);
   const vatTotal = subtotal * (Number(vatRate) / 100);
   const finalTotal = subtotal + vatTotal;
 
@@ -132,15 +146,40 @@ function App() {
     }).format(value || 0);
   };
 
-    const handleSaveEstimate = () => {
+  const handleAddItem = () => {
+    const newItem = {
+      id: Date.now(),
+      workType: selectedWork.label,
+      area: Number(area),
+      pricingMode,
+      quality: pricingMode === "suggested" ? quality : "Manual",
+      materialCostPerUnit,
+      labourCostPerUnit: Number(labourCost),
+      materialTotal: currentMaterialTotal,
+      labourTotal: currentLabourTotal,
+      total: currentItemTotal,
+    };
+
+    setEstimateItems([...estimateItems, newItem]);
+  };
+
+  const handleRemoveItem = (id) => {
+    setEstimateItems(estimateItems.filter((item) => item.id !== id));
+  };
+
+  const handleSaveEstimate = () => {
+    if (estimateItems.length === 0) {
+      return;
+    }
+
     const newEstimate = {
       id: Date.now(),
+      estimateNumber: `EST-${Date.now().toString().slice(-6)}`,
       projectName: projectName.trim() || "Unnamed project",
-      workType: selectedWork.label,
-      area,
-      quality: pricingMode === "suggested" ? quality : "Manual",
-      materialTotal,
-      labourTotal,
+      projectNotes: projectNotes.trim() || "No additional notes",
+      items: estimateItems,
+      vatRate: Number(vatRate),
+      subtotal,
       vatTotal,
       finalTotal,
       createdAt: new Date().toLocaleDateString("en-GB"),
@@ -148,6 +187,8 @@ function App() {
 
     setSavedEstimates([newEstimate, ...savedEstimates]);
     setProjectName("");
+    setProjectNotes("");
+    setEstimateItems([]);
   };
 
   const handleDeleteEstimate = (id) => {
@@ -161,15 +202,15 @@ function App() {
           <p className="eyebrow">Construction + IT portfolio project</p>
           <h1>Construction Project Cost Estimator</h1>
           <p>
-            A practical tool for estimating small construction and renovation jobs
-            using area, material costs, labour rates and VAT.
+            A practical tool for building multi-item estimates for small construction
+            and renovation jobs using material costs, labour rates and VAT.
           </p>
         </div>
 
         <div className="hero-card">
-          <span>Final estimate</span>
+          <span>Current estimate</span>
           <strong>{formatCurrency(finalTotal)}</strong>
-          <small>Based on current project inputs</small>
+          <small>{estimateItems.length} item(s) added</small>
         </div>
       </section>
 
@@ -181,11 +222,24 @@ function App() {
             Project / client name
             <input
               type="text"
-              placeholder="Example: Kitchen flooring"
+              placeholder="Example: Kitchen renovation"
               value={projectName}
               onChange={(event) => setProjectName(event.target.value)}
             />
           </label>
+
+          <label>
+            Project notes
+            <textarea
+              placeholder="Example: Build partition wall and paint the room."
+              value={projectNotes}
+              onChange={(event) => setProjectNotes(event.target.value)}
+            />
+          </label>
+
+          <hr className="section-divider" />
+
+          <h2>Add work item</h2>
 
           <label>
             Work type
@@ -259,7 +313,16 @@ function App() {
             />
           </label>
 
-          <label>
+          <div className="item-preview">
+            <span>Current item total</span>
+            <strong>{formatCurrency(currentItemTotal)}</strong>
+          </div>
+
+          <button className="add-button" type="button" onClick={handleAddItem}>
+            Add item to estimate
+          </button>
+
+          <label className="vat-label">
             VAT rate %
             <input
               type="number"
@@ -269,23 +332,52 @@ function App() {
             />
           </label>
 
-          <button className="save-button" type="button" onClick={handleSaveEstimate}>
-            Save estimate
+          <button
+            className="save-button"
+            type="button"
+            onClick={handleSaveEstimate}
+            disabled={estimateItems.length === 0}
+          >
+            Save full estimate
           </button>
         </div>
 
         <div className="panel result-panel">
-          <h2>Estimate summary</h2>
+          <h2>Current estimate</h2>
+
+          {estimateItems.length === 0 ? (
+            <p className="empty-message">
+              No work items added yet. Add flooring, painting, glazing or partition wall
+              items to build a full estimate.
+            </p>
+          ) : (
+            <div className="estimate-items-list">
+              {estimateItems.map((item, index) => (
+                <div className="estimate-item-card" key={item.id}>
+                  <div>
+                    <p className="item-index">Item {index + 1}</p>
+                    <h3>{item.workType}</h3>
+                    <p>
+                      {item.area} units • {item.quality} • Materials{" "}
+                      {formatCurrency(item.materialTotal)} • Labour{" "}
+                      {formatCurrency(item.labourTotal)}
+                    </p>
+                  </div>
+
+                  <strong>{formatCurrency(item.total)}</strong>
+
+                  <button type="button" onClick={() => handleRemoveItem(item.id)}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="summary-grid">
             <div>
-              <span>Materials</span>
-              <strong>{formatCurrency(materialTotal)}</strong>
-            </div>
-
-            <div>
-              <span>Labour</span>
-              <strong>{formatCurrency(labourTotal)}</strong>
+              <span>Subtotal</span>
+              <strong>{formatCurrency(subtotal)}</strong>
             </div>
 
             <div>
@@ -343,9 +435,12 @@ function App() {
               <div className="saved-card" key={estimate.id}>
                 <div>
                   <h3>{estimate.projectName}</h3>
+                  <p className="estimate-number">{estimate.estimateNumber}</p>
                   <p>
-                    {estimate.workType} • {estimate.area} units • {estimate.quality} • {estimate.createdAt}
+                    {estimate.items.length} item(s) • VAT {estimate.vatRate}% •{" "}
+                    {estimate.createdAt}
                   </p>
+                  <p className="estimate-notes">{estimate.projectNotes}</p>
                 </div>
 
                 <strong>{formatCurrency(estimate.finalTotal)}</strong>

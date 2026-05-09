@@ -102,7 +102,8 @@ label {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   border: 1px solid #d8deea;
   border-radius: 14px;
@@ -114,9 +115,15 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: #d47a35;
   background: #ffffff;
+}
+
+textarea {
+  min-height: 100px;
+  resize: vertical;
 }
 
 .work-description {
@@ -169,7 +176,7 @@ button:hover {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
   gap: 16px;
   margin-bottom: 30px;
 }
@@ -289,6 +296,109 @@ button:hover {
   color: #991b1b;
 }
 
+.estimate-number {
+  margin-bottom: 6px;
+  color: #d47a35 !important;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.estimate-notes {
+  margin-top: 8px;
+  color: #4b5568 !important;
+  line-height: 1.5;
+}
+
+.section-divider {
+  margin: 26px 0;
+  border: none;
+  border-top: 1px solid #e4e9f2;
+}
+
+.item-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0;
+  padding: 18px;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.item-preview span {
+  color: #6d7789;
+  font-weight: 800;
+}
+
+.item-preview strong {
+  font-size: 1.4rem;
+}
+
+.add-button {
+  width: 100%;
+  margin-bottom: 18px;
+  background: #172033;
+  color: white;
+  box-shadow: 0 12px 30px rgba(23, 32, 51, 0.18);
+}
+
+.vat-label {
+  margin-top: 6px;
+}
+
+.save-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+  box-shadow: none;
+}
+
+.estimate-items-list {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.estimate-item-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid #e4e9f2;
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.estimate-item-card h3 {
+  margin-bottom: 6px;
+}
+
+.estimate-item-card p {
+  margin-bottom: 0;
+  color: #6d7789;
+  line-height: 1.5;
+}
+
+.estimate-item-card strong {
+  font-size: 1.3rem;
+}
+
+.estimate-item-card button {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.item-index {
+  margin-bottom: 5px !important;
+  color: #d47a35 !important;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 @media (max-width: 900px) {
   .app {
     padding: 20px;
@@ -303,10 +413,15 @@ button:hover {
     position: static;
   }
 
-  .material-card,
-  .saved-card {
-    grid-template-columns: 1fr;
-  }
+ .material-card,
+.saved-card,
+.estimate-item-card {
+  grid-template-columns: 1fr;
+}
+
+.summary-grid {
+  grid-template-columns: 1fr;
+}
 
   .store-list {
     justify-content: flex-start;
