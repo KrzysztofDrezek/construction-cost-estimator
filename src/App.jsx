@@ -129,7 +129,7 @@ function App() {
 
       const data = await response.json();
       setSavedEstimates(data);
-    } catch (error) {
+    } catch {
       setErrorMessage("Could not load saved estimates from the server.");
     } finally {
       setIsLoading(false);
@@ -439,7 +439,7 @@ const handlePrintEstimate = (estimate) => {
       setProjectName("");
       setProjectNotes("");
       setEstimateItems([]);
-    } catch (error) {
+    } catch {
       setErrorMessage("Could not save estimate to the server.");
     }
   };
@@ -457,7 +457,7 @@ const handlePrintEstimate = (estimate) => {
       }
 
       setSavedEstimates(savedEstimates.filter((estimate) => estimate.id !== id));
-    } catch (error) {
+    } catch {
       setErrorMessage("Could not delete estimate from the server.");
     }
   };
