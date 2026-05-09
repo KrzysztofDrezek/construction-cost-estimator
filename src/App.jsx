@@ -105,6 +105,7 @@ function App() {
 
   const [vatRate, setVatRate] = useState(20);
   const [estimateItems, setEstimateItems] = useState([]);
+  const [expandedEstimateId, setExpandedEstimateId] = useState(null);
 
   const [savedEstimates, setSavedEstimates] = useState(() => {
     try {
@@ -166,6 +167,10 @@ function App() {
   const handleRemoveItem = (id) => {
     setEstimateItems(estimateItems.filter((item) => item.id !== id));
   };
+
+  const handleToggleEstimateDetails = (id) => {
+  setExpandedEstimateId(expandedEstimateId === id ? null : id);
+};
 
   const handleSaveEstimate = () => {
     if (estimateItems.length === 0) {
@@ -431,25 +436,84 @@ function App() {
           <p className="empty-message">No saved estimates yet.</p>
         ) : (
           <div className="saved-list">
-            {savedEstimates.map((estimate) => (
-              <div className="saved-card" key={estimate.id}>
-                <div>
-                  <h3>{estimate.projectName}</h3>
-                  <p className="estimate-number">{estimate.estimateNumber}</p>
-                  <p>
-                    {estimate.items.length} item(s) • VAT {estimate.vatRate}% •{" "}
-                    {estimate.createdAt}
-                  </p>
-                  <p className="estimate-notes">{estimate.projectNotes}</p>
-                </div>
+           {savedEstimates.map((estimate) => (
+  <div className="saved-card" key={estimate.id}>
+    <div className="saved-card-main">
+      <div>
+        <h3>{estimate.projectName}</h3>
+        <p className="estimate-number">{estimate.estimateNumber}</p>
+        <p>
+          {estimate.items?.length || 0} item(s) • VAT {estimate.vatRate}% •{" "}
+          {estimate.createdAt}
+        </p>
+        <p className="estimate-notes">{estimate.projectNotes}</p>
+      </div>
 
-                <strong>{formatCurrency(estimate.finalTotal)}</strong>
+      <strong>{formatCurrency(estimate.finalTotal)}</strong>
 
-                <button type="button" onClick={() => handleDeleteEstimate(estimate.id)}>
-                  Delete
-                </button>
+      <div className="saved-actions">
+        <button
+          className="view-button"
+          type="button"
+          onClick={() => handleToggleEstimateDetails(estimate.id)}
+        >
+          {expandedEstimateId === estimate.id ? "Hide details" : "View details"}
+        </button>
+
+        <button type="button" onClick={() => handleDeleteEstimate(estimate.id)}>
+          Delete
+        </button>
+      </div>
+    </div>
+
+    {expandedEstimateId === estimate.id && (
+      <div className="estimate-details">
+        <h4>Estimate breakdown</h4>
+
+        <div className="details-items">
+          {estimate.items?.map((item, index) => (
+            <div className="details-item" key={item.id}>
+              <div>
+                <p className="item-index">Item {index + 1}</p>
+                <h5>{item.workType}</h5>
+                <p>
+                  Area / quantity: <strong>{item.area}</strong>
+                </p>
+                <p>
+                  Pricing: <strong>{item.quality}</strong>
+                </p>
               </div>
-            ))}
+
+              <div>
+                <p>
+                  Materials: <strong>{formatCurrency(item.materialTotal)}</strong>
+                </p>
+                <p>
+                  Labour: <strong>{formatCurrency(item.labourTotal)}</strong>
+                </p>
+                <p>
+                  Item total: <strong>{formatCurrency(item.total)}</strong>
+                </p>
+              </div>
+            </div>
+          ))}
+            </div>
+
+            <div className="details-summary">
+              <p>
+                Subtotal: <strong>{formatCurrency(estimate.subtotal)}</strong>
+              </p>
+              <p>
+                VAT: <strong>{formatCurrency(estimate.vatTotal)}</strong>
+              </p>
+              <p>
+                Final total: <strong>{formatCurrency(estimate.finalTotal)}</strong>
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    ))}
           </div>
         )}
       </section>

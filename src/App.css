@@ -269,13 +269,16 @@ button:hover {
 }
 
 .saved-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: #f8fafc;
+}
+
+.saved-card-main {
   display: grid;
   grid-template-columns: 1fr auto auto;
   gap: 18px;
   align-items: center;
-  padding: 18px;
-  border-radius: 20px;
-  background: #f8fafc;
 }
 
 .saved-card h3 {
@@ -399,6 +402,73 @@ button:hover {
   letter-spacing: 0.06em;
 }
 
+.saved-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.view-button {
+  background: #e0ecff !important;
+  color: #1d4ed8 !important;
+}
+
+.estimate-details {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e4e9f2;
+}
+
+.estimate-details h4 {
+  margin-bottom: 16px;
+}
+
+.details-items {
+  display: grid;
+  gap: 12px;
+}
+
+.details-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e4e9f2;
+}
+
+.details-item h5 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.details-item p {
+  margin-bottom: 6px;
+  color: #5d6778;
+}
+
+.details-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #172033;
+  color: white;
+}
+
+.details-summary p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.details-summary strong {
+  color: white;
+}
+
 @media (max-width: 900px) {
   .app {
     padding: 20px;
@@ -413,9 +483,10 @@ button:hover {
     position: static;
   }
 
- .material-card,
-.saved-card,
-.estimate-item-card {
+.material-card,
+.saved-card-main,
+.estimate-item-card,
+.details-item {
   grid-template-columns: 1fr;
 }
 
@@ -426,4 +497,17 @@ button:hover {
   .store-list {
     justify-content: flex-start;
   }
+
+  .saved-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.saved-actions button {
+  width: 100%;
+}
+
+.details-summary {
+  justify-content: flex-start;
+}
 }
