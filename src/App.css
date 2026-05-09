@@ -469,6 +469,23 @@ button:hover {
   color: white;
 }
 
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.details-header h4 {
+  margin-bottom: 0;
+}
+
+.print-button {
+  background: #172033;
+  color: white;
+}
+
 @media (max-width: 900px) {
   .app {
     padding: 20px;
@@ -509,5 +526,14 @@ button:hover {
 
 .details-summary {
   justify-content: flex-start;
+}
+
+.details-header {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.print-button {
+  width: 100%;
 }
 }

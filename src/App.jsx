@@ -172,6 +172,220 @@ function App() {
   setExpandedEstimateId(expandedEstimateId === id ? null : id);
 };
 
+const handlePrintEstimate = (estimate) => {
+  const printWindow = window.open("", "_blank");
+
+  if (!printWindow) {
+    return;
+  }
+
+  const itemsHtml = estimate.items
+    .map(
+      (item, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${item.workType}</td>
+          <td>${item.area}</td>
+          <td>${item.quality}</td>
+          <td>${formatCurrency(item.materialTotal)}</td>
+          <td>${formatCurrency(item.labourTotal)}</td>
+          <td>${formatCurrency(item.total)}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>${estimate.estimateNumber} - ${estimate.projectName}</title>
+        <style>
+          body {
+            margin: 0;
+            padding: 40px;
+            font-family: Arial, sans-serif;
+            color: #172033;
+            background: #ffffff;
+          }
+
+          .document {
+            max-width: 900px;
+            margin: 0 auto;
+          }
+
+          .header {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            border-bottom: 3px solid #172033;
+            padding-bottom: 24px;
+            margin-bottom: 30px;
+          }
+
+          h1 {
+            margin: 0 0 8px;
+            font-size: 34px;
+          }
+
+          h2 {
+            margin-top: 32px;
+            font-size: 22px;
+          }
+
+          p {
+            line-height: 1.6;
+          }
+
+          .meta {
+            text-align: right;
+          }
+
+          .meta strong {
+            display: block;
+            font-size: 22px;
+            margin-bottom: 8px;
+          }
+
+          .notes {
+            padding: 16px;
+            border-radius: 10px;
+            background: #f4f6f8;
+            margin-bottom: 28px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 14px;
+          }
+
+          th,
+          td {
+            border: 1px solid #d8deea;
+            padding: 12px;
+            text-align: left;
+            font-size: 14px;
+          }
+
+          th {
+            background: #172033;
+            color: white;
+          }
+
+          .summary {
+            margin-top: 28px;
+            margin-left: auto;
+            width: 320px;
+            border: 1px solid #d8deea;
+            border-radius: 12px;
+            overflow: hidden;
+          }
+
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border-bottom: 1px solid #d8deea;
+          }
+
+          .summary-row:last-child {
+            border-bottom: none;
+            background: #172033;
+            color: white;
+            font-weight: 700;
+            font-size: 18px;
+          }
+
+          .footer {
+            margin-top: 40px;
+            padding-top: 18px;
+            border-top: 1px solid #d8deea;
+            color: #667085;
+            font-size: 13px;
+          }
+
+          @media print {
+            body {
+              padding: 20px;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="document">
+          <div class="header">
+            <div>
+              <h1>Project Estimate</h1>
+              <p><strong>Project:</strong> ${estimate.projectName}</p>
+              <p><strong>Estimate number:</strong> ${estimate.estimateNumber}</p>
+            </div>
+
+            <div class="meta">
+              <strong>${formatCurrency(estimate.finalTotal)}</strong>
+              <span>Date: ${estimate.createdAt}</span>
+            </div>
+          </div>
+
+          <h2>Project notes</h2>
+          <div class="notes">
+            ${estimate.projectNotes}
+          </div>
+
+          <h2>Work breakdown</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Work type</th>
+                <th>Area / Qty</th>
+                <th>Pricing</th>
+                <th>Materials</th>
+                <th>Labour</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+
+          <div class="summary">
+            <div class="summary-row">
+              <span>Subtotal</span>
+              <strong>${formatCurrency(estimate.subtotal)}</strong>
+            </div>
+
+            <div class="summary-row">
+              <span>VAT (${estimate.vatRate}%)</span>
+              <strong>${formatCurrency(estimate.vatTotal)}</strong>
+            </div>
+
+            <div class="summary-row">
+              <span>Final total</span>
+              <strong>${formatCurrency(estimate.finalTotal)}</strong>
+            </div>
+          </div>
+
+          <div class="footer">
+            This estimate was generated using Construction Project Cost Estimator.
+            Material prices are indicative and may vary by supplier, brand and availability.
+          </div>
+        </div>
+
+        <script>
+          window.onload = function () {
+            window.print();
+          };
+        </script>
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+};
+
   const handleSaveEstimate = () => {
     if (estimateItems.length === 0) {
       return;
@@ -468,7 +682,17 @@ function App() {
 
     {expandedEstimateId === estimate.id && (
       <div className="estimate-details">
-        <h4>Estimate breakdown</h4>
+        <div className="details-header">
+          <h4>Estimate breakdown</h4>
+
+          <button
+            className="print-button"
+            type="button"
+            onClick={() => handlePrintEstimate(estimate)}
+          >
+            Print estimate
+          </button>
+        </div>
 
         <div className="details-items">
           {estimate.items?.map((item, index) => (
