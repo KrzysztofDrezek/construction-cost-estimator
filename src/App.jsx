@@ -1,7 +1,20 @@
 import { useEffect, useState } from "react";
+import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import "./App.css";
 
-const API_URL = "http://localhost:5000/api/estimates";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const API_URL = `${API_BASE_URL}/estimates`;
+const STORES_API_URL = `${API_BASE_URL}/stores/nearby`;
+
+const userLocationIcon = L.divIcon({
+  className: "user-location-marker",
+  html: "<span>📍</span>",
+  iconSize: [34, 34],
+  iconAnchor: [17, 17],
+  popupAnchor: [0, -18],
+});
 
 const workTypes = {
   flooring: {
@@ -14,7 +27,6 @@ const workTypes = {
         budget: 12,
         standard: 22,
         premium: 35,
-        stores: ["B&Q", "Wickes", "Homebase"],
       },
       {
         name: "Underlay",
@@ -22,7 +34,6 @@ const workTypes = {
         budget: 3,
         standard: 6,
         premium: 10,
-        stores: ["B&Q", "Screwfix", "Toolstation"],
       },
     ],
   },
@@ -36,7 +47,6 @@ const workTypes = {
         budget: 4,
         standard: 8,
         premium: 15,
-        stores: ["B&Q", "Wickes", "Dulux Decorator Centre"],
       },
       {
         name: "Rollers, brushes and masking tape",
@@ -44,7 +54,6 @@ const workTypes = {
         budget: 8,
         standard: 18,
         premium: 35,
-        stores: ["Toolstation", "Screwfix", "B&Q"],
       },
     ],
   },
@@ -58,7 +67,6 @@ const workTypes = {
         budget: 35,
         standard: 65,
         premium: 120,
-        stores: ["B&Q", "Wickes", "Specialist supplier"],
       },
       {
         name: "Sealant and fixings",
@@ -66,7 +74,6 @@ const workTypes = {
         budget: 8,
         standard: 18,
         premium: 35,
-        stores: ["Toolstation", "Screwfix", "B&Q"],
       },
     ],
   },
@@ -80,7 +87,6 @@ const workTypes = {
         budget: 9,
         standard: 14,
         premium: 22,
-        stores: ["B&Q", "Wickes", "Selco"],
       },
       {
         name: "Studs, screws and jointing materials",
@@ -88,7 +94,6 @@ const workTypes = {
         budget: 25,
         standard: 45,
         premium: 75,
-        stores: ["Toolstation", "Screwfix", "B&Q"],
       },
     ],
   },
@@ -113,31 +118,37 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const [storeSearch, setStoreSearch] = useState("");
+  const [storeSearchLinks, setStoreSearchLinks] = useState([]);
+  const [storeSearchLocation, setStoreSearchLocation] = useState(null);
+  const [isStoreLoading, setIsStoreLoading] = useState(false);
+  const [storeErrorMessage, setStoreErrorMessage] = useState("");
+
   const selectedWork = workTypes[workType];
 
   useEffect(() => {
-  const fetchEstimates = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
+    const fetchEstimates = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
 
-      const response = await fetch(API_URL);
+        const response = await fetch(API_URL);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch estimates.");
+        if (!response.ok) {
+          throw new Error("Failed to fetch estimates.");
+        }
+
+        const data = await response.json();
+        setSavedEstimates(data);
+      } catch {
+        setErrorMessage("Could not load saved estimates from the server.");
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      const data = await response.json();
-      setSavedEstimates(data);
-    } catch {
-      setErrorMessage("Could not load saved estimates from the server.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  fetchEstimates();
-}, []);
+    fetchEstimates();
+  }, []);
 
   const suggestedMaterialCost = selectedWork.materials.reduce(
     (total, material) => total + material[quality],
@@ -182,224 +193,6 @@ function App() {
   const handleRemoveItem = (id) => {
     setEstimateItems(estimateItems.filter((item) => item.id !== id));
   };
-
-  const handleToggleEstimateDetails = (id) => {
-  setExpandedEstimateId(expandedEstimateId === id ? null : id);
-};
-
-const handlePrintEstimate = (estimate) => {
-  const printWindow = window.open("", "_blank");
-
-  if (!printWindow) {
-    return;
-  }
-
-  const itemsHtml = estimate.items
-    .map(
-      (item, index) => `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${item.workType}</td>
-          <td>${item.area}</td>
-          <td>${item.quality}</td>
-          <td>${formatCurrency(item.materialTotal)}</td>
-          <td>${formatCurrency(item.labourTotal)}</td>
-          <td>${formatCurrency(item.total)}</td>
-        </tr>
-      `
-    )
-    .join("");
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>${estimate.estimateNumber} - ${estimate.projectName}</title>
-        <style>
-          body {
-            margin: 0;
-            padding: 40px;
-            font-family: Arial, sans-serif;
-            color: #172033;
-            background: #ffffff;
-          }
-
-          .document {
-            max-width: 900px;
-            margin: 0 auto;
-          }
-
-          .header {
-            display: flex;
-            justify-content: space-between;
-            gap: 30px;
-            border-bottom: 3px solid #172033;
-            padding-bottom: 24px;
-            margin-bottom: 30px;
-          }
-
-          h1 {
-            margin: 0 0 8px;
-            font-size: 34px;
-          }
-
-          h2 {
-            margin-top: 32px;
-            font-size: 22px;
-          }
-
-          p {
-            line-height: 1.6;
-          }
-
-          .meta {
-            text-align: right;
-          }
-
-          .meta strong {
-            display: block;
-            font-size: 22px;
-            margin-bottom: 8px;
-          }
-
-          .notes {
-            padding: 16px;
-            border-radius: 10px;
-            background: #f4f6f8;
-            margin-bottom: 28px;
-          }
-
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 14px;
-          }
-
-          th,
-          td {
-            border: 1px solid #d8deea;
-            padding: 12px;
-            text-align: left;
-            font-size: 14px;
-          }
-
-          th {
-            background: #172033;
-            color: white;
-          }
-
-          .summary {
-            margin-top: 28px;
-            margin-left: auto;
-            width: 320px;
-            border: 1px solid #d8deea;
-            border-radius: 12px;
-            overflow: hidden;
-          }
-
-          .summary-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 14px 16px;
-            border-bottom: 1px solid #d8deea;
-          }
-
-          .summary-row:last-child {
-            border-bottom: none;
-            background: #172033;
-            color: white;
-            font-weight: 700;
-            font-size: 18px;
-          }
-
-          .footer {
-            margin-top: 40px;
-            padding-top: 18px;
-            border-top: 1px solid #d8deea;
-            color: #667085;
-            font-size: 13px;
-          }
-
-          @media print {
-            body {
-              padding: 20px;
-            }
-          }
-        </style>
-      </head>
-
-      <body>
-        <div class="document">
-          <div class="header">
-            <div>
-              <h1>Project Estimate</h1>
-              <p><strong>Project:</strong> ${estimate.projectName}</p>
-              <p><strong>Estimate number:</strong> ${estimate.estimateNumber}</p>
-            </div>
-
-            <div class="meta">
-              <strong>${formatCurrency(estimate.finalTotal)}</strong>
-              <span>Date: ${estimate.createdAt}</span>
-            </div>
-          </div>
-
-          <h2>Project notes</h2>
-          <div class="notes">
-            ${estimate.projectNotes}
-          </div>
-
-          <h2>Work breakdown</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Work type</th>
-                <th>Area / Qty</th>
-                <th>Pricing</th>
-                <th>Materials</th>
-                <th>Labour</th>
-                <th>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-
-          <div class="summary">
-            <div class="summary-row">
-              <span>Subtotal</span>
-              <strong>${formatCurrency(estimate.subtotal)}</strong>
-            </div>
-
-            <div class="summary-row">
-              <span>VAT (${estimate.vatRate}%)</span>
-              <strong>${formatCurrency(estimate.vatTotal)}</strong>
-            </div>
-
-            <div class="summary-row">
-              <span>Final total</span>
-              <strong>${formatCurrency(estimate.finalTotal)}</strong>
-            </div>
-          </div>
-
-          <div class="footer">
-            This estimate was generated using Construction Project Cost Estimator.
-            Material prices are indicative and may vary by supplier, brand and availability.
-          </div>
-        </div>
-
-        <script>
-          window.onload = function () {
-            window.print();
-          };
-        </script>
-      </body>
-    </html>
-  `);
-
-  printWindow.document.close();
-};
 
   const handleSaveEstimate = async () => {
     if (estimateItems.length === 0) {
@@ -462,6 +255,264 @@ const handlePrintEstimate = (estimate) => {
     }
   };
 
+  const handleToggleEstimateDetails = (id) => {
+    setExpandedEstimateId(expandedEstimateId === id ? null : id);
+  };
+
+  const handleStoreSearch = async () => {
+    if (!storeSearch.trim()) {
+      setStoreSearchLinks([]);
+      setStoreSearchLocation(null);
+      setStoreErrorMessage("Enter a UK postcode.");
+      return;
+    }
+
+    try {
+      setIsStoreLoading(true);
+      setStoreErrorMessage("");
+      setStoreSearchLinks([]);
+      setStoreSearchLocation(null);
+
+      const response = await fetch(
+        `${STORES_API_URL}?location=${encodeURIComponent(storeSearch)}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to prepare store search.");
+      }
+
+      const data = await response.json();
+
+      setStoreSearchLinks(data.searchLinks || []);
+      setStoreSearchLocation(data.searchLocation || null);
+
+      if (data.searchLocation?.warning) {
+        setStoreErrorMessage(data.searchLocation.warning);
+      }
+    } catch {
+      setStoreErrorMessage(
+        "Could not prepare nearby store search. Try another UK postcode."
+      );
+    } finally {
+      setIsStoreLoading(false);
+    }
+  };
+
+  const handlePrintEstimate = (estimate) => {
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      return;
+    }
+
+    const itemsHtml = estimate.items
+      .map(
+        (item, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${item.workType}</td>
+            <td>${item.area}</td>
+            <td>${item.quality}</td>
+            <td>${formatCurrency(item.materialTotal)}</td>
+            <td>${formatCurrency(item.labourTotal)}</td>
+            <td>${formatCurrency(item.total)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${estimate.estimateNumber} - ${estimate.projectName}</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 40px;
+              font-family: Arial, sans-serif;
+              color: #172033;
+              background: #ffffff;
+            }
+
+            .document {
+              max-width: 900px;
+              margin: 0 auto;
+            }
+
+            .header {
+              display: flex;
+              justify-content: space-between;
+              gap: 30px;
+              border-bottom: 3px solid #172033;
+              padding-bottom: 24px;
+              margin-bottom: 30px;
+            }
+
+            h1 {
+              margin: 0 0 8px;
+              font-size: 34px;
+            }
+
+            h2 {
+              margin-top: 32px;
+              font-size: 22px;
+            }
+
+            p {
+              line-height: 1.6;
+            }
+
+            .meta {
+              text-align: right;
+            }
+
+            .meta strong {
+              display: block;
+              font-size: 22px;
+              margin-bottom: 8px;
+            }
+
+            .notes {
+              padding: 16px;
+              border-radius: 10px;
+              background: #f4f6f8;
+              margin-bottom: 28px;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 14px;
+            }
+
+            th,
+            td {
+              border: 1px solid #d8deea;
+              padding: 12px;
+              text-align: left;
+              font-size: 14px;
+            }
+
+            th {
+              background: #172033;
+              color: white;
+            }
+
+            .summary {
+              margin-top: 28px;
+              margin-left: auto;
+              width: 320px;
+              border: 1px solid #d8deea;
+              border-radius: 12px;
+              overflow: hidden;
+            }
+
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 14px 16px;
+              border-bottom: 1px solid #d8deea;
+            }
+
+            .summary-row:last-child {
+              border-bottom: none;
+              background: #172033;
+              color: white;
+              font-weight: 700;
+              font-size: 18px;
+            }
+
+            .footer {
+              margin-top: 40px;
+              padding-top: 18px;
+              border-top: 1px solid #d8deea;
+              color: #667085;
+              font-size: 13px;
+            }
+
+            @media print {
+              body {
+                padding: 20px;
+              }
+            }
+          </style>
+        </head>
+
+        <body>
+          <div class="document">
+            <div class="header">
+              <div>
+                <h1>Project Estimate</h1>
+                <p><strong>Project:</strong> ${estimate.projectName}</p>
+                <p><strong>Estimate number:</strong> ${estimate.estimateNumber}</p>
+              </div>
+
+              <div class="meta">
+                <strong>${formatCurrency(estimate.finalTotal)}</strong>
+                <span>Date: ${estimate.createdAt}</span>
+              </div>
+            </div>
+
+            <h2>Project notes</h2>
+            <div class="notes">
+              ${estimate.projectNotes}
+            </div>
+
+            <h2>Work breakdown</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Work type</th>
+                  <th>Area / Qty</th>
+                  <th>Pricing</th>
+                  <th>Materials</th>
+                  <th>Labour</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml}
+              </tbody>
+            </table>
+
+            <div class="summary">
+              <div class="summary-row">
+                <span>Subtotal</span>
+                <strong>${formatCurrency(estimate.subtotal)}</strong>
+              </div>
+
+              <div class="summary-row">
+                <span>VAT (${estimate.vatRate}%)</span>
+                <strong>${formatCurrency(estimate.vatTotal)}</strong>
+              </div>
+
+              <div class="summary-row">
+                <span>Final total</span>
+                <strong>${formatCurrency(estimate.finalTotal)}</strong>
+              </div>
+            </div>
+
+            <div class="footer">
+              This estimate was generated using Construction Project Cost Estimator.
+              Material prices are indicative and may vary by supplier, product brand,
+              availability and current promotions.
+            </div>
+          </div>
+
+          <script>
+            window.onload = function () {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  };
+
   return (
     <main className="app">
       <section className="hero">
@@ -470,7 +521,8 @@ const handlePrintEstimate = (estimate) => {
           <h1>Construction Project Cost Estimator</h1>
           <p>
             A practical tool for building multi-item estimates for small construction
-            and renovation jobs using material costs, labour rates and VAT.
+            and renovation jobs using material costs, labour rates, VAT and nearby
+            supplier search.
           </p>
         </div>
 
@@ -661,8 +713,8 @@ const handlePrintEstimate = (estimate) => {
           <div className="price-guide">
             <h3>Material price guide</h3>
             <p>
-              Typical UK material price ranges. Prices are indicative and may vary
-              by supplier, brand and availability.
+              * Indicative UK material price ranges only. Actual prices may vary
+              depending on supplier, product brand, availability and current promotions.
             </p>
 
             {selectedWork.materials.map((material) => (
@@ -679,16 +731,100 @@ const handlePrintEstimate = (estimate) => {
                     Premium: {formatCurrency(material.premium)} / {material.unit}
                   </p>
                 </div>
-
-                <div className="store-list">
-                  {material.stores.map((store) => (
-                    <span key={store}>{store}</span>
-                  ))}
-                </div>
               </div>
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="panel store-locator-panel">
+        <div className="store-locator-header">
+          <div>
+            <h2>Nearby construction stores</h2>
+            <p>
+              Search by UK postcode. The map uses postcode coordinates, and the links
+              open real store searches in external map services.
+            </p>
+          </div>
+        </div>
+
+        <div className="store-search-row">
+          <input
+            type="text"
+            placeholder="Example: SE2 9HR, LS15, OX1"
+            value={storeSearch}
+            onChange={(event) => setStoreSearch(event.target.value)}
+          />
+
+          <button type="button" onClick={handleStoreSearch}>
+            Find stores
+          </button>
+        </div>
+
+        {storeErrorMessage && <p className="error-message">{storeErrorMessage}</p>}
+
+        {isStoreLoading ? (
+          <p className="empty-message">Preparing location search...</p>
+        ) : storeSearchLocation ? (
+          <div className="store-map-layout">
+            <div className="map-wrapper">
+              <MapContainer
+                center={[storeSearchLocation.lat, storeSearchLocation.lon]}
+                zoom={13}
+                scrollWheelZoom={false}
+                className="store-map"
+                key={`${storeSearchLocation.lat}-${storeSearchLocation.lon}`}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+
+                <Marker
+                  position={[storeSearchLocation.lat, storeSearchLocation.lon]}
+                  icon={userLocationIcon}
+                >
+                  <Popup>
+                    <strong>Search location</strong>
+                    <br />
+                    {storeSearchLocation.displayName}
+                  </Popup>
+                </Marker>
+              </MapContainer>
+            </div>
+
+            <div className="store-results">
+              <div className="location-card">
+                <h3>Search location</h3>
+                <p>{storeSearchLocation.displayName}</p>
+                <p>
+                  Use the links below to open real nearby store searches in map services.
+                </p>
+              </div>
+
+              {storeSearchLinks.map((link) => (
+                <a
+                  className="store-link-card"
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  key={link.id}
+                >
+                  <div>
+                    <h3>{link.title}</h3>
+                    <p>{link.description}</p>
+                  </div>
+
+                  <span>Open</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="empty-message">
+            Try searching for a UK postcode to open nearby construction store searches.
+          </p>
+        )}
       </section>
 
       <section className="panel saved-panel">
@@ -702,94 +838,94 @@ const handlePrintEstimate = (estimate) => {
           <p className="empty-message">No saved estimates yet.</p>
         ) : (
           <div className="saved-list">
-           {savedEstimates.map((estimate) => (
-  <div className="saved-card" key={estimate.id}>
-    <div className="saved-card-main">
-      <div>
-        <h3>{estimate.projectName}</h3>
-        <p className="estimate-number">{estimate.estimateNumber}</p>
-        <p>
-          {estimate.items?.length || 0} item(s) • VAT {estimate.vatRate}% •{" "}
-          {estimate.createdAt}
-        </p>
-        <p className="estimate-notes">{estimate.projectNotes}</p>
-      </div>
+            {savedEstimates.map((estimate) => (
+              <div className="saved-card" key={estimate.id}>
+                <div className="saved-card-main">
+                  <div>
+                    <h3>{estimate.projectName}</h3>
+                    <p className="estimate-number">{estimate.estimateNumber}</p>
+                    <p>
+                      {estimate.items?.length || 0} item(s) • VAT {estimate.vatRate}% •{" "}
+                      {estimate.createdAt}
+                    </p>
+                    <p className="estimate-notes">{estimate.projectNotes}</p>
+                  </div>
 
-      <strong>{formatCurrency(estimate.finalTotal)}</strong>
+                  <strong>{formatCurrency(estimate.finalTotal)}</strong>
 
-      <div className="saved-actions">
-        <button
-          className="view-button"
-          type="button"
-          onClick={() => handleToggleEstimateDetails(estimate.id)}
-        >
-          {expandedEstimateId === estimate.id ? "Hide details" : "View details"}
-        </button>
+                  <div className="saved-actions">
+                    <button
+                      className="view-button"
+                      type="button"
+                      onClick={() => handleToggleEstimateDetails(estimate.id)}
+                    >
+                      {expandedEstimateId === estimate.id ? "Hide details" : "View details"}
+                    </button>
 
-        <button type="button" onClick={() => handleDeleteEstimate(estimate.id)}>
-          Delete
-        </button>
-      </div>
-    </div>
+                    <button type="button" onClick={() => handleDeleteEstimate(estimate.id)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
 
-    {expandedEstimateId === estimate.id && (
-      <div className="estimate-details">
-        <div className="details-header">
-          <h4>Estimate breakdown</h4>
+                {expandedEstimateId === estimate.id && (
+                  <div className="estimate-details">
+                    <div className="details-header">
+                      <h4>Estimate breakdown</h4>
 
-          <button
-            className="print-button"
-            type="button"
-            onClick={() => handlePrintEstimate(estimate)}
-          >
-            Print estimate
-          </button>
-        </div>
+                      <button
+                        className="print-button"
+                        type="button"
+                        onClick={() => handlePrintEstimate(estimate)}
+                      >
+                        Print estimate
+                      </button>
+                    </div>
 
-        <div className="details-items">
-          {estimate.items?.map((item, index) => (
-            <div className="details-item" key={item.id}>
-              <div>
-                <p className="item-index">Item {index + 1}</p>
-                <h5>{item.workType}</h5>
-                <p>
-                  Area / quantity: <strong>{item.area}</strong>
-                </p>
-                <p>
-                  Pricing: <strong>{item.quality}</strong>
-                </p>
+                    <div className="details-items">
+                      {estimate.items?.map((item, index) => (
+                        <div className="details-item" key={item.id}>
+                          <div>
+                            <p className="item-index">Item {index + 1}</p>
+                            <h5>{item.workType}</h5>
+                            <p>
+                              Area / quantity: <strong>{item.area}</strong>
+                            </p>
+                            <p>
+                              Pricing: <strong>{item.quality}</strong>
+                            </p>
+                          </div>
+
+                          <div>
+                            <p>
+                              Materials: <strong>{formatCurrency(item.materialTotal)}</strong>
+                            </p>
+                            <p>
+                              Labour: <strong>{formatCurrency(item.labourTotal)}</strong>
+                            </p>
+                            <p>
+                              Item total: <strong>{formatCurrency(item.total)}</strong>
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="details-summary">
+                      <p>
+                        Subtotal: <strong>{formatCurrency(estimate.subtotal)}</strong>
+                      </p>
+                      <p>
+                        VAT: <strong>{formatCurrency(estimate.vatTotal)}</strong>
+                      </p>
+                      <p>
+                        Final total: <strong>{formatCurrency(estimate.finalTotal)}</strong>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              <div>
-                <p>
-                  Materials: <strong>{formatCurrency(item.materialTotal)}</strong>
-                </p>
-                <p>
-                  Labour: <strong>{formatCurrency(item.labourTotal)}</strong>
-                </p>
-                <p>
-                  Item total: <strong>{formatCurrency(item.total)}</strong>
-                </p>
-              </div>
-            </div>
-          ))}
-            </div>
-
-            <div className="details-summary">
-              <p>
-                Subtotal: <strong>{formatCurrency(estimate.subtotal)}</strong>
-              </p>
-              <p>
-                VAT: <strong>{formatCurrency(estimate.vatTotal)}</strong>
-              </p>
-              <p>
-                Final total: <strong>{formatCurrency(estimate.finalTotal)}</strong>
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    ))}
+            ))}
           </div>
         )}
       </section>

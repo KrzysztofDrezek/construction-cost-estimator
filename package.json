@@ -4,18 +4,20 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-  "dev": "concurrently \"npm run server\" \"npm run client\"",
-  "client": "vite",
-  "server": "nodemon server/index.cjs",
-  "build": "vite build",
-  "lint": "eslint .",
-  "preview": "vite preview"
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "vite",
+    "server": "nodemon server/index.cjs",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "leaflet": "^1.9.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-leaflet": "^5.0.0",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {

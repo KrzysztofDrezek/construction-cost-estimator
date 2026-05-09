@@ -29,6 +29,116 @@ db.serialize(() => {
   `);
 });
 
+const isLikelyUkPostcode = (location) => {
+  const postcodePattern =
+    /^[A-Z]{1,2}[0-9][A-Z0-9]?\s?[0-9]?[A-Z]{0,2}$/i;
+
+  return postcodePattern.test(location.trim());
+};
+
+const geocodeLocation = async (location) => {
+  const cleanedLocation = location.trim();
+
+  if (!isLikelyUkPostcode(cleanedLocation)) {
+    return {
+      lat: 51.5072,
+      lon: -0.1276,
+      displayName: `${cleanedLocation}, UK`,
+      input: cleanedLocation,
+      warning:
+        "Town and area search is shown as a helper. For best accuracy, use a UK postcode.",
+    };
+  }
+
+  const postcodeUrl = `https://api.postcodes.io/postcodes/${encodeURIComponent(
+    cleanedLocation
+  )}`;
+
+  const postcodeResponse = await fetch(postcodeUrl);
+
+  if (postcodeResponse.ok) {
+    const postcodeData = await postcodeResponse.json();
+
+    if (postcodeData.status === 200 && postcodeData.result) {
+      return {
+        lat: postcodeData.result.latitude,
+        lon: postcodeData.result.longitude,
+        displayName: `${postcodeData.result.postcode}, ${postcodeData.result.admin_district}`,
+        input: cleanedLocation,
+        warning: "",
+      };
+    }
+  }
+
+  const outwardCode = cleanedLocation.split(" ")[0];
+
+  const outwardCodeUrl = `https://api.postcodes.io/outcodes/${encodeURIComponent(
+    outwardCode
+  )}`;
+
+  const outwardCodeResponse = await fetch(outwardCodeUrl);
+
+  if (outwardCodeResponse.ok) {
+    const outwardCodeData = await outwardCodeResponse.json();
+
+    if (outwardCodeData.status === 200 && outwardCodeData.result) {
+      return {
+        lat: outwardCodeData.result.latitude,
+        lon: outwardCodeData.result.longitude,
+        displayName: `${outwardCodeData.result.outcode}, UK`,
+        input: cleanedLocation,
+        warning:
+          "Only the outward postcode area was found, so the map location is approximate.",
+      };
+    }
+  }
+
+  return null;
+};
+
+const createStoreSearchLinks = (location) => {
+  const encodedLocation = encodeURIComponent(location);
+
+  return [
+    {
+      id: "google-builders-merchants",
+      title: "Builders merchants near this location",
+      description: "Search Google Maps for builders merchants near the entered postcode.",
+      url: `https://www.google.com/maps/search/builders+merchants+near+${encodedLocation}`,
+    },
+    {
+      id: "google-bq",
+      title: "B&Q near this location",
+      description: "Search Google Maps for nearby B&Q stores.",
+      url: `https://www.google.com/maps/search/B%26Q+near+${encodedLocation}`,
+    },
+    {
+      id: "google-screwfix",
+      title: "Screwfix near this location",
+      description: "Search Google Maps for nearby Screwfix stores.",
+      url: `https://www.google.com/maps/search/Screwfix+near+${encodedLocation}`,
+    },
+    {
+      id: "google-toolstation",
+      title: "Toolstation near this location",
+      description: "Search Google Maps for nearby Toolstation stores.",
+      url: `https://www.google.com/maps/search/Toolstation+near+${encodedLocation}`,
+    },
+    {
+      id: "google-wickes",
+      title: "Wickes near this location",
+      description: "Search Google Maps for nearby Wickes stores.",
+      url: `https://www.google.com/maps/search/Wickes+near+${encodedLocation}`,
+    },
+    {
+      id: "osm-hardware",
+      title: "OpenStreetMap hardware stores",
+      description: "Open a map search for hardware and DIY stores in OpenStreetMap.",
+      url: `https://www.openstreetmap.org/search?query=hardware%20store%20near%20${encodedLocation}`,
+    },
+  ];
+};
+
 app.get("/api/estimates", (req, res) => {
   db.all("SELECT * FROM estimates ORDER BY id DESC", [], (error, rows) => {
     if (error) {
@@ -141,6 +251,41 @@ app.delete("/api/estimates/:id", (req, res) => {
 
     res.json({ message: "Estimate deleted successfully." });
   });
+});
+
+app.get("/api/stores/nearby", async (req, res) => {
+  const location = req.query.location?.trim();
+
+  if (!location) {
+    return res.status(400).json({ error: "Location is required." });
+  }
+
+  try {
+    const geocodedLocation = await geocodeLocation(location);
+
+    if (!geocodedLocation) {
+      return res.status(404).json({ error: "Location not found." });
+    }
+
+    res.json({
+      searchLocation: {
+        input: location,
+        displayName: geocodedLocation.displayName,
+        lat: geocodedLocation.lat,
+        lon: geocodedLocation.lon,
+        warning: geocodedLocation.warning,
+      },
+      stores: [],
+      searchLinks: createStoreSearchLinks(location),
+    });
+  } catch (error) {
+    console.error("Store helper failed:", error.message);
+
+    res.status(500).json({
+      error: "Failed to prepare nearby store search.",
+      details: error.message,
+    });
+  }
 });
 
 app.listen(PORT, () => {
