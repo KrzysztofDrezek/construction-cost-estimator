@@ -1,18 +1,88 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
+const session = require("express-session");
+const bcrypt = require("bcryptjs");
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "fallback-session-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 1000 * 60 * 60 * 24,
+    },
+  })
+);
 
 const dbPath = path.join(__dirname, "estimates.db");
 const db = new sqlite3.Database(dbPath);
 
+const addColumnIfMissing = (tableName, columnName, columnDefinition) => {
+  db.all(`PRAGMA table_info(${tableName})`, (error, columns) => {
+    if (error) {
+      console.error(`Failed to inspect ${tableName}:`, error.message);
+      return;
+    }
+
+    const columnExists = columns.some((column) => column.name === columnName);
+
+    if (!columnExists) {
+      db.run(
+        `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDefinition}`,
+        (alterError) => {
+          if (alterError) {
+            console.error(
+              `Failed to add ${columnName} to ${tableName}:`,
+              alterError.message
+            );
+          }
+        }
+      );
+    }
+  });
+};
+
 db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      passwordHash TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    )
+  `);
+
   db.run(`
     CREATE TABLE IF NOT EXISTS estimates (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +97,18 @@ db.serialize(() => {
       createdAt TEXT NOT NULL
     )
   `);
+
+  addColumnIfMissing("estimates", "userId", "INTEGER");
 });
+
+const requireAuth = (req, res, next) => {
+  if (req.session?.userId) {
+    next();
+    return;
+  }
+
+  res.status(401).json({ error: "Authentication required." });
+};
 
 const isLikelyUkPostcode = (location) => {
   const postcodePattern =
@@ -139,41 +220,167 @@ const createStoreSearchLinks = (location) => {
   ];
 };
 
-app.get("/api/estimates", (req, res) => {
-  db.all("SELECT * FROM estimates ORDER BY id DESC", [], (error, rows) => {
-    if (error) {
-      return res.status(500).json({ error: "Failed to fetch estimates." });
+app.post("/api/auth/register", async (req, res) => {
+  const { username, password } = req.body;
+
+  const cleanUsername = username?.trim();
+
+  if (!cleanUsername || !password) {
+    return res.status(400).json({ error: "Username and password are required." });
+  }
+
+  if (cleanUsername.length < 3) {
+    return res.status(400).json({ error: "Username must be at least 3 characters." });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters." });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const createdAt = new Date().toLocaleDateString("en-GB");
+
+    db.run(
+      `
+        INSERT INTO users (username, passwordHash, createdAt)
+        VALUES (?, ?, ?)
+      `,
+      [cleanUsername, passwordHash, createdAt],
+      function (error) {
+        if (error) {
+          if (error.message.includes("UNIQUE")) {
+            return res.status(409).json({ error: "Username already exists." });
+          }
+
+          return res.status(500).json({ error: "Failed to create account." });
+        }
+
+        req.session.userId = this.lastID;
+        req.session.username = cleanUsername;
+
+        res.status(201).json({
+          message: "Account created successfully.",
+          user: {
+            id: this.lastID,
+            username: cleanUsername,
+          },
+        });
+      }
+    );
+  } catch {
+    res.status(500).json({ error: "Failed to register user." });
+  }
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const { username, password } = req.body;
+
+  const cleanUsername = username?.trim();
+
+  if (!cleanUsername || !password) {
+    return res.status(400).json({ error: "Username and password are required." });
+  }
+
+  db.get(
+    "SELECT * FROM users WHERE username = ?",
+    [cleanUsername],
+    async (error, user) => {
+      if (error) {
+        return res.status(500).json({ error: "Failed to log in." });
+      }
+
+      if (!user) {
+        return res.status(401).json({ error: "Invalid username or password." });
+      }
+
+      const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+
+      if (!passwordMatches) {
+        return res.status(401).json({ error: "Invalid username or password." });
+      }
+
+      req.session.userId = user.id;
+      req.session.username = user.username;
+
+      res.json({
+        message: "Login successful.",
+        user: {
+          id: user.id,
+          username: user.username,
+        },
+      });
     }
+  );
+});
 
-    const estimates = rows.map((row) => ({
-      ...row,
-      items: JSON.parse(row.items),
-    }));
+app.get("/api/auth/me", (req, res) => {
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: "Not authenticated." });
+  }
 
-    res.json(estimates);
+  res.json({
+    user: {
+      id: req.session.userId,
+      username: req.session.username,
+    },
   });
 });
 
-app.get("/api/estimates/:id", (req, res) => {
+app.post("/api/auth/logout", (req, res) => {
+  req.session.destroy((error) => {
+    if (error) {
+      return res.status(500).json({ error: "Failed to log out." });
+    }
+
+    res.clearCookie("connect.sid");
+    res.json({ message: "Logged out successfully." });
+  });
+});
+
+app.get("/api/estimates", requireAuth, (req, res) => {
+  db.all(
+    "SELECT * FROM estimates WHERE userId = ? ORDER BY id DESC",
+    [req.session.userId],
+    (error, rows) => {
+      if (error) {
+        return res.status(500).json({ error: "Failed to fetch estimates." });
+      }
+
+      const estimates = rows.map((row) => ({
+        ...row,
+        items: JSON.parse(row.items),
+      }));
+
+      res.json(estimates);
+    }
+  );
+});
+
+app.get("/api/estimates/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  db.get("SELECT * FROM estimates WHERE id = ?", [id], (error, row) => {
-    if (error) {
-      return res.status(500).json({ error: "Failed to fetch estimate." });
-    }
+  db.get(
+    "SELECT * FROM estimates WHERE id = ? AND userId = ?",
+    [id, req.session.userId],
+    (error, row) => {
+      if (error) {
+        return res.status(500).json({ error: "Failed to fetch estimate." });
+      }
 
-    if (!row) {
-      return res.status(404).json({ error: "Estimate not found." });
-    }
+      if (!row) {
+        return res.status(404).json({ error: "Estimate not found." });
+      }
 
-    res.json({
-      ...row,
-      items: JSON.parse(row.items),
-    });
-  });
+      res.json({
+        ...row,
+        items: JSON.parse(row.items),
+      });
+    }
+  );
 });
 
-app.post("/api/estimates", (req, res) => {
+app.post("/api/estimates", requireAuth, (req, res) => {
   const {
     estimateNumber,
     projectName,
@@ -192,6 +399,7 @@ app.post("/api/estimates", (req, res) => {
 
   const sql = `
     INSERT INTO estimates (
+      userId,
       estimateNumber,
       projectName,
       projectNotes,
@@ -202,10 +410,11 @@ app.post("/api/estimates", (req, res) => {
       finalTotal,
       createdAt
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const values = [
+    req.session.userId,
     estimateNumber,
     projectName,
     projectNotes,
@@ -224,6 +433,7 @@ app.post("/api/estimates", (req, res) => {
 
     res.status(201).json({
       id: this.lastID,
+      userId: req.session.userId,
       estimateNumber,
       projectName,
       projectNotes,
@@ -237,23 +447,27 @@ app.post("/api/estimates", (req, res) => {
   });
 });
 
-app.delete("/api/estimates/:id", (req, res) => {
+app.delete("/api/estimates/:id", requireAuth, (req, res) => {
   const { id } = req.params;
 
-  db.run("DELETE FROM estimates WHERE id = ?", [id], function (error) {
-    if (error) {
-      return res.status(500).json({ error: "Failed to delete estimate." });
-    }
+  db.run(
+    "DELETE FROM estimates WHERE id = ? AND userId = ?",
+    [id, req.session.userId],
+    function (error) {
+      if (error) {
+        return res.status(500).json({ error: "Failed to delete estimate." });
+      }
 
-    if (this.changes === 0) {
-      return res.status(404).json({ error: "Estimate not found." });
-    }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: "Estimate not found." });
+      }
 
-    res.json({ message: "Estimate deleted successfully." });
-  });
+      res.json({ message: "Estimate deleted successfully." });
+    }
+  );
 });
 
-app.get("/api/stores/nearby", async (req, res) => {
+app.get("/api/stores/nearby", requireAuth, async (req, res) => {
   const location = req.query.location?.trim();
 
   if (!location) {

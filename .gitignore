@@ -27,3 +27,4 @@ node_modules
 dist
 .env
 server/estimates.db
+.env

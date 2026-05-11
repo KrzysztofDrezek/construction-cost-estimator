@@ -582,6 +582,48 @@ button:hover {
   box-shadow: 0 14px 34px rgba(23, 32, 51, 0.08);
 }
 
+.login-panel {
+  max-width: 520px;
+  margin: 80px auto;
+}
+
+.login-panel h1 {
+  margin-bottom: 14px;
+}
+
+.login-panel > p {
+  color: #5c667a;
+  line-height: 1.6;
+}
+
+.login-form {
+  margin-top: 28px;
+}
+
+.logout-button {
+  margin-top: 18px;
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.auth-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.auth-switch button {
+  background: #edf1f7;
+  color: #4d5a70;
+}
+
+.auth-switch button.active {
+  background: #172033;
+  color: white;
+}
+
 @media (max-width: 900px) {
   .app {
     padding: 20px;

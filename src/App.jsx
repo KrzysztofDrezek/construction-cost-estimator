@@ -7,6 +7,10 @@ import "./App.css";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 const API_URL = `${API_BASE_URL}/estimates`;
 const STORES_API_URL = `${API_BASE_URL}/stores/nearby`;
+const LOGIN_API_URL = `${API_BASE_URL}/auth/login`;
+const REGISTER_API_URL = `${API_BASE_URL}/auth/register`;
+const ME_API_URL = `${API_BASE_URL}/auth/me`;
+const LOGOUT_API_URL = `${API_BASE_URL}/auth/logout`;
 
 const userLocationIcon = L.divIcon({
   className: "user-location-marker",
@@ -100,6 +104,13 @@ const workTypes = {
 };
 
 function App() {
+  const [user, setUser] = useState(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState("login");
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+
   const [projectName, setProjectName] = useState("");
   const [projectNotes, setProjectNotes] = useState("");
 
@@ -127,12 +138,42 @@ function App() {
   const selectedWork = workTypes[workType];
 
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch(ME_API_URL, {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          setUser(null);
+          return;
+        }
+
+        const data = await response.json();
+        setUser(data.user);
+      } catch {
+        setUser(null);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
     const fetchEstimates = async () => {
+      if (!user) {
+        return;
+      }
+
       try {
         setIsLoading(true);
         setErrorMessage("");
 
-        const response = await fetch(API_URL);
+        const response = await fetch(API_URL, {
+          credentials: "include",
+        });
 
         if (!response.ok) {
           throw new Error("Failed to fetch estimates.");
@@ -148,7 +189,7 @@ function App() {
     };
 
     fetchEstimates();
-  }, []);
+  }, [user]);
 
   const suggestedMaterialCost = selectedWork.materials.reduce(
     (total, material) => total + material[quality],
@@ -171,6 +212,54 @@ function App() {
       style: "currency",
       currency: "GBP",
     }).format(value || 0);
+  };
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+
+    const endpoint = authMode === "login" ? LOGIN_API_URL : REGISTER_API_URL;
+
+    try {
+      setAuthError("");
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          username: authUsername,
+          password: authPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Authentication failed.");
+      }
+
+      setUser(data.user);
+      setAuthUsername("");
+      setAuthPassword("");
+    } catch (error) {
+      setAuthError(error.message);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch(LOGOUT_API_URL, {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      setUser(null);
+      setSavedEstimates([]);
+      setEstimateItems([]);
+      setExpandedEstimateId(null);
+    }
   };
 
   const handleAddItem = () => {
@@ -219,6 +308,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify(newEstimate),
       });
 
@@ -243,6 +333,7 @@ function App() {
 
       const response = await fetch(`${API_URL}/${id}`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -274,7 +365,10 @@ function App() {
       setStoreSearchLocation(null);
 
       const response = await fetch(
-        `${STORES_API_URL}?location=${encodeURIComponent(storeSearch)}`
+        `${STORES_API_URL}?location=${encodeURIComponent(storeSearch)}`,
+        {
+          credentials: "include",
+        }
       );
 
       if (!response.ok) {
@@ -513,6 +607,89 @@ function App() {
     printWindow.document.close();
   };
 
+  if (isAuthLoading) {
+    return (
+      <main className="app">
+        <section className="panel login-panel">
+          <h1>Loading...</h1>
+          <p className="empty-message">Checking your session.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <main className="app">
+        <section className="panel login-panel">
+          <p className="eyebrow">Protected estimator dashboard</p>
+          <h1>{authMode === "login" ? "Sign in" : "Create account"}</h1>
+          <p>
+            {authMode === "login"
+              ? "Log in to access the Construction Project Cost Estimator dashboard."
+              : "Create an account to save estimates and manage your own project records."}
+          </p>
+
+          <div className="auth-switch">
+            <button
+              type="button"
+              className={authMode === "login" ? "active" : ""}
+              onClick={() => {
+                setAuthMode("login");
+                setAuthError("");
+              }}
+            >
+              Sign in
+            </button>
+
+            <button
+              type="button"
+              className={authMode === "register" ? "active" : ""}
+              onClick={() => {
+                setAuthMode("register");
+                setAuthError("");
+              }}
+            >
+              Create account
+            </button>
+          </div>
+
+          <form className="login-form" onSubmit={handleAuthSubmit}>
+            <label>
+              Username
+              <input
+                type="text"
+                value={authUsername}
+                onChange={(event) => setAuthUsername(event.target.value)}
+                placeholder="Enter username"
+              />
+            </label>
+
+            <label>
+              Password
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                placeholder={
+                  authMode === "register"
+                    ? "Minimum 6 characters"
+                    : "Enter password"
+                }
+              />
+            </label>
+
+            {authError && <p className="error-message">{authError}</p>}
+
+            <button className="save-button" type="submit">
+              {authMode === "login" ? "Sign in" : "Create account"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="app">
       <section className="hero">
@@ -527,9 +704,13 @@ function App() {
         </div>
 
         <div className="hero-card">
-          <span>Current estimate</span>
+          <span>Signed in as {user.username}</span>
           <strong>{formatCurrency(finalTotal)}</strong>
           <small>{estimateItems.length} item(s) added</small>
+
+          <button className="logout-button" type="button" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </section>
 
