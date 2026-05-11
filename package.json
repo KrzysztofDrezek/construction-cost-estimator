@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "client": "vite",
     "server": "nodemon server/index.cjs",
+    "start": "node server/index.cjs"
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
