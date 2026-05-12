@@ -3,9 +3,12 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
+const SQLiteStoreFactory = require("connect-sqlite3");
 const bcrypt = require("bcryptjs");
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
+
+const SQLiteStore = SQLiteStoreFactory(session);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -35,6 +38,12 @@ app.use(express.json());
 
 app.use(
   session({
+    store: new SQLiteStore({
+      db: "sessions.db",
+      dir: path.join(__dirname),
+      table: "sessions",
+      concurrentDB: true,
+    }),
     secret: process.env.SESSION_SECRET || "fallback-session-secret",
     resave: false,
     saveUninitialized: false,
@@ -335,7 +344,12 @@ app.post("/api/auth/logout", (req, res) => {
       return res.status(500).json({ error: "Failed to log out." });
     }
 
-    res.clearCookie("connect.sid");
+    res.clearCookie("connect.sid", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    });
+
     res.json({ message: "Logged out successfully." });
   });
 });
