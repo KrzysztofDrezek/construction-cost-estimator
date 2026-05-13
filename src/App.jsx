@@ -714,6 +714,26 @@ function App() {
         </div>
       </section>
 
+            <section className="coffee-banner">
+        <div>
+          <p className="eyebrow">Support the project</p>
+          <h2>Like this estimator?</h2>
+          <p>
+            This project was built as a practical full-stack tool combining
+            construction experience with software development. If you find it useful,
+            you can support future improvements.
+          </p>
+        </div>
+
+        <a
+          href="https://buymeacoffee.com/KrzysztofDrezek"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Buy me a coffee
+        </a>
+      </section>
+
       <section className="layout">
         <div className="panel form-panel">
           <h2>Project details</h2>

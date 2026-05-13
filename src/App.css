@@ -624,6 +624,55 @@ button:hover {
   color: white;
 }
 
+.coffee-banner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 28px;
+  padding: 28px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #172033 0%, #28364f 100%);
+  color: white;
+  box-shadow: 0 20px 60px rgba(23, 32, 51, 0.12);
+}
+
+.coffee-banner h2 {
+  margin-bottom: 8px;
+  font-size: 1.8rem;
+}
+
+.coffee-banner p {
+  max-width: 760px;
+  margin-bottom: 0;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.6;
+}
+
+.coffee-banner .eyebrow {
+  color: #f2b37e;
+}
+
+.coffee-banner a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 180px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: #d47a35;
+  color: white;
+  font-weight: 900;
+  text-decoration: none;
+  box-shadow: 0 12px 30px rgba(212, 122, 53, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.coffee-banner a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(212, 122, 53, 0.34);
+}
+
 @media (max-width: 900px) {
   .app {
     padding: 20px;
@@ -632,6 +681,14 @@ button:hover {
   .hero,
   .layout {
     grid-template-columns: 1fr;
+  }
+
+    .coffee-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .coffee-banner a {
+    width: 100%;
   }
 
   .form-panel {
