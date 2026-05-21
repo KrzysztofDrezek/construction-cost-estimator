@@ -1,8 +1,22 @@
 import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
+
+import type {
+  AuthMode,
+  AuthUser,
+  EstimateItem,
+  PricingMode,
+  QualityLevel,
+  SavedEstimate,
+  StoreSearchLink,
+  StoreSearchLocation,
+  WorkTypeKey,
+  WorkTypes,
+} from "./types/appTypes";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 const API_URL = `${API_BASE_URL}/estimates`;
@@ -20,7 +34,7 @@ const userLocationIcon = L.divIcon({
   popupAnchor: [0, -18],
 });
 
-const workTypes = {
+const workTypes: WorkTypes = {
   flooring: {
     label: "Flooring",
     description: "Estimate flooring projects using material, underlay and labour costs.",
@@ -104,9 +118,9 @@ const workTypes = {
 };
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [authMode, setAuthMode] = useState("login");
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -114,24 +128,25 @@ function App() {
   const [projectName, setProjectName] = useState("");
   const [projectNotes, setProjectNotes] = useState("");
 
-  const [workType, setWorkType] = useState("flooring");
+  const [workType, setWorkType] = useState<WorkTypeKey>("flooring");
   const [area, setArea] = useState(20);
-  const [pricingMode, setPricingMode] = useState("suggested");
-  const [quality, setQuality] = useState("standard");
+  const [pricingMode, setPricingMode] = useState<PricingMode>("suggested");
+  const [quality, setQuality] = useState<QualityLevel>("standard");
   const [manualMaterialCost, setManualMaterialCost] = useState(20);
   const [labourCost, setLabourCost] = useState(25);
 
   const [vatRate, setVatRate] = useState(20);
-  const [estimateItems, setEstimateItems] = useState([]);
-  const [expandedEstimateId, setExpandedEstimateId] = useState(null);
+  const [estimateItems, setEstimateItems] = useState<EstimateItem[]>([]);
+  const [expandedEstimateId, setExpandedEstimateId] = useState<number | null>(null);
 
-  const [savedEstimates, setSavedEstimates] = useState([]);
+  const [savedEstimates, setSavedEstimates] = useState<SavedEstimate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const [storeSearch, setStoreSearch] = useState("");
-  const [storeSearchLinks, setStoreSearchLinks] = useState([]);
-  const [storeSearchLocation, setStoreSearchLocation] = useState(null);
+  const [storeSearchLinks, setStoreSearchLinks] = useState<StoreSearchLink[]>([]);
+  const [storeSearchLocation, setStoreSearchLocation] =
+    useState<StoreSearchLocation | null>(null);
   const [isStoreLoading, setIsStoreLoading] = useState(false);
   const [storeErrorMessage, setStoreErrorMessage] = useState("");
 
@@ -207,14 +222,14 @@ function App() {
   const vatTotal = subtotal * (Number(vatRate) / 100);
   const finalTotal = subtotal + vatTotal;
 
-  const formatCurrency = (value) => {
+  const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-GB", {
       style: "currency",
       currency: "GBP",
     }).format(value || 0);
   };
 
-  const handleAuthSubmit = async (event) => {
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const endpoint = authMode === "login" ? LOGIN_API_URL : REGISTER_API_URL;
@@ -244,7 +259,11 @@ function App() {
       setAuthUsername("");
       setAuthPassword("");
     } catch (error) {
-      setAuthError(error.message);
+      if (error instanceof Error) {
+        setAuthError(error.message);
+      } else {
+        setAuthError("Authentication failed.");
+      }
     }
   };
 
@@ -263,7 +282,7 @@ function App() {
   };
 
   const handleAddItem = () => {
-    const newItem = {
+    const newItem: EstimateItem = {
       id: Date.now(),
       workType: selectedWork.label,
       area: Number(area),
@@ -279,7 +298,7 @@ function App() {
     setEstimateItems([...estimateItems, newItem]);
   };
 
-  const handleRemoveItem = (id) => {
+  const handleRemoveItem = (id: number) => {
     setEstimateItems(estimateItems.filter((item) => item.id !== id));
   };
 
@@ -316,7 +335,7 @@ function App() {
         throw new Error("Failed to save estimate.");
       }
 
-      const savedEstimate = await response.json();
+      const savedEstimate: SavedEstimate = await response.json();
 
       setSavedEstimates([savedEstimate, ...savedEstimates]);
       setProjectName("");
@@ -327,7 +346,7 @@ function App() {
     }
   };
 
-  const handleDeleteEstimate = async (id) => {
+  const handleDeleteEstimate = async (id: number) => {
     try {
       setErrorMessage("");
 
@@ -346,7 +365,7 @@ function App() {
     }
   };
 
-  const handleToggleEstimateDetails = (id) => {
+  const handleToggleEstimateDetails = (id: number) => {
     setExpandedEstimateId(expandedEstimateId === id ? null : id);
   };
 
@@ -392,7 +411,7 @@ function App() {
     }
   };
 
-  const handlePrintEstimate = (estimate) => {
+  const handlePrintEstimate = (estimate: SavedEstimate) => {
     const printWindow = window.open("", "_blank");
 
     if (!printWindow) {
@@ -714,7 +733,7 @@ function App() {
         </div>
       </section>
 
-            <section className="coffee-banner">
+      <section className="coffee-banner">
         <div>
           <p className="eyebrow">Support the project</p>
           <h2>Like this estimator?</h2>
@@ -763,7 +782,10 @@ function App() {
 
           <label>
             Work type
-            <select value={workType} onChange={(event) => setWorkType(event.target.value)}>
+            <select
+              value={workType}
+              onChange={(event) => setWorkType(event.target.value as WorkTypeKey)}
+            >
               {Object.entries(workTypes).map(([key, item]) => (
                 <option key={key} value={key}>
                   {item.label}
@@ -780,7 +802,7 @@ function App() {
               type="number"
               min="1"
               value={area}
-              onChange={(event) => setArea(event.target.value)}
+              onChange={(event) => setArea(Number(event.target.value))}
             />
           </label>
 
@@ -805,7 +827,10 @@ function App() {
           {pricingMode === "suggested" ? (
             <label>
               Material quality level
-              <select value={quality} onChange={(event) => setQuality(event.target.value)}>
+              <select
+                value={quality}
+                onChange={(event) => setQuality(event.target.value as QualityLevel)}
+              >
                 <option value="budget">Budget</option>
                 <option value="standard">Standard</option>
                 <option value="premium">Premium</option>
@@ -818,7 +843,7 @@ function App() {
                 type="number"
                 min="0"
                 value={manualMaterialCost}
-                onChange={(event) => setManualMaterialCost(event.target.value)}
+                onChange={(event) => setManualMaterialCost(Number(event.target.value))}
               />
             </label>
           )}
@@ -829,7 +854,7 @@ function App() {
               type="number"
               min="0"
               value={labourCost}
-              onChange={(event) => setLabourCost(event.target.value)}
+              onChange={(event) => setLabourCost(Number(event.target.value))}
             />
           </label>
 
@@ -848,7 +873,7 @@ function App() {
               type="number"
               min="0"
               value={vatRate}
-              onChange={(event) => setVatRate(event.target.value)}
+              onChange={(event) => setVatRate(Number(event.target.value))}
             />
           </label>
 
